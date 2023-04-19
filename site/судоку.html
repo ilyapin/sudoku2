@@ -1,0 +1,365 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>судоку</title>
+<style>
+a{
+text-decoration:none;
+}
+a:hover{
+text-decoration:underline;
+}
+a.value{
+color:black;
+font-weight: bold;
+}
+a.suggestion{
+color:red;
+}
+td{
+min-width:40px;
+min-height:40px;
+text-align:center;
+}
+td.lg{
+	background-color: lightgrey;
+}
+</style>
+</head>
+<body>
+<!-- 0,0,0,0,5,0,0,9,0,0,0,6,4,1,0,0,0,0,3,0,0,0,0,0,0,0,7,0,0,0,1,9,0,3,0,0,0,0,0,6,0,5,0,0,0,8,0,0,0,0,0,0,5,0,0,0,7,0,0,9,0,8,0,0,2,0,0,0,0,0,0,0,0,4,1,3,8,0,5,0,0-->
+
+<table border="0">
+<tr>
+	<td><table id="maintable" border="1" cellpadding="0" cellspacing="0" style="border:1px solid black"></table></td>
+	<td>
+		<button id="suggestbtn" onclick="suggestclick()">Suggest a Solution</button><br>
+		<label><input type="checkbox" id="autosetsuggested">Auto set suggested</label><br>
+		<button onclick="loadclick()">Load From Text</button><br>
+		<textarea id="sudocu" cols=18 rows=9></textarea>
+	</td>
+</table>
+<script type="text/javascript">
+var Idx = new (function ()
+{
+	var idxRow, idxCol, idxSqr;
+	idxRow = Array(9);
+	for (var i=0; i<9; i++){
+		idxRow[i] = Array(9);
+		for (var j=0;j<9;j++)
+			idxRow[i][j] = [i,j];
+	}
+	idxCol = Array(9);
+	for (var i=0; i<9; i++){
+		idxCol[i] = Array(9);
+		for (var j=0;j<9;j++)
+			idxCol[i][j] = [j,i];
+	}
+	idxSqr = Array(9);
+	var i = 0;
+	for (var r=0;r<3;r++)
+		for (var c=0;c<3;c++)
+		{
+			var br = r*3;
+			var bc = c*3;
+			var j = 0;
+			idxSqr[i] = Array(9);
+			for (var idx=br;idx<br+3;idx++)
+				for (var idy=bc;idy<bc+3;idy++)
+					idxSqr[i][j++] = [idx,idy];
+			i++;
+		}
+	this.row = idxRow;
+	this.col = idxCol;
+	this.sqr = idxSqr;
+	this.getSqrOf = function(row,col){
+		var res = row / 3 |0;
+		res += col / 3 |0;
+		return res;
+	}
+//	console.log("-- by rows - ");
+//	for (var i=0;i<9;i++) // row
+//		console.log(this.row[i].toString());		
+//	console.log("-- by cols - ");
+//	for (var i=0;i<9;i++) // col
+//		console.log(this.col[i].toString());
+//	console.log("-- by sqr - ");
+//	for (var i=0;i<9;i++) // sqr
+//		console.log(this.sqr[i].toString());		
+})();
+
+function Sudoku(initialVals)
+{
+	// private
+	var cellVals, cellPVals;
+
+	function initVals()
+	{
+		cellVals=Array(9);
+		cellPVals=Array(9);
+		for (var i=0;i<9;i++)
+		{
+			cellVals[i]=[0,0,0,0,0,0,0,0,0];
+			cellPVals[i]=Array(9);
+			for (var j=0;j<9;j++)
+				cellPVals[i][j]=[1,2,3,4,5,6,7,8,9];
+		}
+	}
+
+	function updatePV(idx, v)
+	{
+		for (var i=0;i<idx.length;i++)
+		{
+			var newa=[];
+			var olda=cellPVals[idx[i][0]][idx[i][1]];
+			for(var j=0; j<olda.length;j++)
+				if (olda[j] != v)
+					newa.push(olda[j]);
+			cellPVals[idx[i][0]][idx[i][1]]=newa;
+		}
+	}
+
+	function findRule2(idx)
+	{
+		var result = 0; 
+		var m = [0,0,0,0,0,0,0,0,0];
+		var m_cell = Array(9);
+		for (var j=0;j<9;j++) 
+		{
+			var r = idx[j][0];
+			var c = idx[j][1];
+			if(cellVals[r][c] == 0 && cellPVals[r][c].length > 0)
+			{
+				var a = cellPVals[r][c];
+				for (var k=0;k<a.length;k++)
+				{
+					m[a[k]-1]++;
+					m_cell[a[k]-1] = [r,c];
+				} 
+
+			}
+		}
+		for(var i=0;i<9;i++)
+		if(m[i]==1){
+			result++;
+			var s = {row:m_cell[i][0]+1,col:m_cell[i][1]+1,value:i+1};
+			console.log(s);
+			cellPVals[m_cell[i][0]][m_cell[i][1]] = [i+1];
+		}
+		return result;
+	}
+	// public
+	function cellValsToString_impl()
+	{
+		var res = "";
+		for(var i=0; i<9;i++){
+			var r="";
+			for(var j=0; j<9;j++)
+				r = r + cellVals[i][j];
+			res = res +r + String.fromCharCode(13);
+		}
+		return res;
+	}
+
+	function updateVals_impl(aNewVals)
+	{
+		initVals();
+		var iNV = 0;
+		for (var i=0;i<9;i++)
+			for (var j=0;j<9;j++)
+			{
+				if(iNV < aNewVals.length)
+				{
+					var v = aNewVals[iNV++]
+					if (v>0)
+						setValue_impl(i, j, v, false);
+				}
+			}
+	}
+
+	function setValue_impl(row, col, v, bUpdateUI)
+	{
+		if(cellVals[row][col] == v)
+			return;
+		if (cellVals[row][col] > 0) {
+			throw new Error("Oops!");
+			return;
+		}
+		cellVals[row][col] = v;
+		cellPVals[row][col] = [];
+
+		updatePV(Idx.row[row], v);
+		updatePV(Idx.col[col], v);
+		updatePV(Idx.sqr[Idx.getSqrOf(row, col)]);
+		
+		if(bUpdateUI && typeof(this.onUpdateUI) == "function")
+			this.onUpdateUI();
+	}
+
+	function findSuggestions_impl()
+	{
+		// rule 2
+		for (var i=0;i<9;i++) // row
+			findRule2(Idx.row[i]);		
+		for (var i=0;i<9;i++) // col
+			findRule2(Idx.col[i]);
+		for (var i=0;i<9;i++) // row
+			findRule2(Idx.sqr[i]);
+					
+		var res = 0;	
+		for (var i=0;i<9;i++)
+			for (var j=0;j<9;j++)
+			if (cellPVals[i][j].length == 1)
+				res ++;
+		return res;
+	}
+	
+	function setSuggested_impl()
+	{
+		var res = 0;	
+		for (var i=0;i<9;i++)
+			for (var j=0;j<9;j++)
+			if (cellPVals[i][j].length == 1)
+			{
+				res ++;
+				setValue_impl(i,j,cellPVals[i][j][0], false);
+			}	
+		return res;
+	}
+
+	if (typeof(initialVals) != "undefined")
+		updateVals_impl(initialVals);
+	else
+		initVals();
+
+	return {
+		cellValsToString : cellValsToString_impl,
+		setValue : setValue_impl,
+		getValue : function (row, col) {	return cellVals[row][col];	},
+		getPV : function (row, col) {	return cellPVals[row][col];	},
+		updateVals : updateVals_impl,
+		findSuggestions : findSuggestions_impl,
+		setSuggestions : setSuggested_impl
+	};
+}
+
+</script>
+
+<script type="text/javascript">
+function UpdateCell(row, col, val, aPossibleValues)
+{
+	var cellElem = document.getElementById("cell"+row+col);
+	cellElem.innerHTML = "";
+	if(val > 0) {
+		var a = document.createElement("a");
+		a.innerHTML = val;
+		a.className = "value";
+		a.href="javascript:undoclick("+row+","+col+")";
+		cellElem.appendChild(a);
+		return;
+	}
+
+	for (var index = 0; index < aPossibleValues.length; ++index) {
+		var v = aPossibleValues[index];
+		var a = document.createElement("a");
+		a.innerHTML = v;
+		if (aPossibleValues.length ==1)
+			a.className = "suggestion";
+		a.href="javascript:cellclick("+row+","+col+","+v+")";
+		cellElem.appendChild(a);
+	}
+}
+
+function InitTable()
+{
+	var table = document.getElementById("maintable");
+	for (var i=0;i<9;i++)
+	{
+		var rowCount = table.rows.length;
+		var row = table.insertRow(rowCount);
+		for (var j=0;j<9;j++)
+		{
+			cell = row.insertCell(j);
+			cell.id="cell"+i+j;
+		}
+	}
+	var alg=[[0,3],[3,0],[3,6],[6,3]];
+	for (var isqr = 0; isqr<alg.length; isqr++)
+		for (var i=alg[isqr][0];i<alg[isqr][0]+3;i++)
+			for (var j=alg[isqr][1];j<alg[isqr][1]+3;j++)
+				document.getElementById("cell"+i+j).className = "lg";
+}
+
+
+function UpdateCells()
+{
+	for (var i=0;i<9;i++)
+		for (var j=0;j<9;j++)
+			UpdateCell(i, j, s.getValue(i,j), s.getPV(i,j));
+	document.getElementById("sudocu").value = s.cellValsToString();
+}
+
+function setSuggestions()
+{
+	s.setSuggestions();
+	var i = s.findSuggestions();
+	UpdateCells();
+	if (i>0 && document.getElementById("autosetsuggested").checked)
+		setTimeout("setSuggestions()",1000);
+	else
+		document.getElementById("suggestbtn").enabled = true;
+}
+
+function cellclick(row, col, v)
+{
+	s.setValue(row,col,v);
+	UpdateCells();
+	//??
+}
+
+function undoclick(row,col)
+{
+	throw new Error("todo");
+//	s.setValue(row, col, 0);
+//	var s = cellVals.toString();
+//	var a = eval('['+s+']');
+//	UpdateVals(a)
+}
+
+function loadclick() 
+{
+	var str = document.getElementById("sudocu").value;
+	var a;
+	if (str.search(',')>0)
+	 	a = eval('['+str+']');
+	else {
+		a = [];
+		var b=['0','1','2','3','4','5','6','7','8','9'];
+		var j=0;
+		for(var i=0;i<str.length;i++){
+			var c = str.charAt(i);
+			if (b.indexOf(c)>=0)
+				a[j++]=eval(c);
+		}
+	}
+	s = new Sudoku(a); 
+	UpdateCells();
+}
+
+function suggestclick()
+{
+	document.getElementById("suggestbtn").enabled = false;
+	if (s.findSuggestions() > 0)
+		setTimeout("setSuggestions()",1000);
+	else
+		document.getElementById("suggestbtn").enabled = true;
+}
+
+var s = new Sudoku();
+InitTable();
+UpdateCells();
+
+</script>
+</body>
+</html>
