@@ -20,7 +20,7 @@ class Utils{
 		if (!method)
 			throw Error('fetchSudokusrv !method');
 		let opt = null;
-		let url = "./php/sudokusrv.php?method=" + method;
+		let url = "https://print2flash.com/ilya/sudoku/srv/?method=" + method;
 		if (params){
 			let data = new FormData();
 			for (const paramName in params)
@@ -30,6 +30,7 @@ class Utils{
 				body: data
 			};
 		}
+		
 		fetch(url, opt)
 		.then(this.handleFetchErrors)
 		.then((res) => { return res.json(); })
